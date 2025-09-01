@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { X } from 'lucide-react';
-
+import confetti from 'canvas-confetti';
 // Common languages and tools for quick selection
 const commonLanguages = ['JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust', 'PHP', 'Ruby', 'Swift', 'Kotlin'];
 const commonTools = ['VS Code', 'IntelliJ', 'Git', 'Docker', 'AWS', 'Firebase', 'Next.js', 'React', 'Vue', 'Angular', 'Node.js', 'PostgreSQL'];
@@ -67,7 +67,7 @@ export default function NewEntryPage() {
       loadTodayEntry();
     }
   }, [user, loadTodayEntry]);
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -94,7 +94,7 @@ export default function NewEntryPage() {
       
       // Trigger confetti animation
       if (typeof window !== 'undefined') {
-        const confetti = require('canvas-confetti');
+        // const confetti = require('canvas-confetti');
         confetti({
           particleCount: 100,
           spread: 70,

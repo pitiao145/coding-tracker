@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -18,17 +18,16 @@ export default function EntryDetailPage({ params }) {
   const router = useRouter();
   const [entry, setEntry] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Unwrap params using React.use()
+  const resolvedParams = use(params);
+  const entryId = resolvedParams.id;
 
-  useEffect(() => {
-    if (user && params.id) {
-      loadEntry();
-    }
-  }, [user, params.id, loadEntry]);
-
+  
   const loadEntry = useCallback(async () => {
     try {
       setLoading(true);
-      const entryDoc = await getDoc(doc(db, 'entries', params.id));
+      const entryDoc = await getDoc(doc(db, 'entries', entryId));
       if (entryDoc.exists()) {
         const data = entryDoc.data();
         // Check if user owns this entry
@@ -49,15 +48,21 @@ export default function EntryDetailPage({ params }) {
     } finally {
       setLoading(false);
     }
-  }, [params.id, user, router]);
-
+  }, [entryId, user, router]);
+  
+  useEffect(() => {
+    if (user && entryId) {
+      loadEntry();
+    }
+  }, [user, entryId, loadEntry]);
+  
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this entry?')) {
       return;
     }
 
     try {
-      await deleteDoc(doc(db, 'entries', params.id));
+      await deleteDoc(doc(db, 'entries', entryId));
       toast.success('Entry deleted successfully');
       router.push('/dashboard');
     } catch (error) {

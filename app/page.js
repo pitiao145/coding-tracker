@@ -124,7 +124,7 @@ export default function HomePage() {
                   <h3 className="text-lg font-semibold">Language Insights</h3>
                 </div>
                 <p className="text-muted-foreground">
-                  Track which languages and tools you&apos;re using most frequently.
+                  Track which languages and tools youre using most frequently.
                 </p>
               </CardContent>
             </Card>

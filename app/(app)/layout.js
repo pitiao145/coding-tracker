@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { Analytics } from "@vercel/analytics/next"
 
 export default function AppLayout({ children }) {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ export default function AppLayout({ children }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
+      <Analytics/>
     </div>
   );
 }

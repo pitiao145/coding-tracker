@@ -37,71 +37,77 @@ export default function NewEntryPage() {
     commonTools: []
   });
 
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const entryId = `${user?.uid}_${today}`;
+  // Add date state - default to today
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  
+  // Generate entry ID based on selected date
+  const entryId = user ? `${user.uid}_${selectedDate}` : '';
 
-// Load user preferences
-const loadUserPreferences = useCallback(async () => {
-  if (!user) return;
-  
-  try {
-    const prefsDoc = await getDoc(doc(db, 'userPreferences', user.uid));
-    if (prefsDoc.exists()) {
-      const data = prefsDoc.data();
-      setUserPreferences({
-        commonLanguages: data.commonLanguages || [],
-        commonTools: data.commonTools || []
-      });
-    } else {
-      // Initialize with default preferences if none exist
-      const defaultLanguages = [
-        "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "Go", "Rust", "PHP", "Ruby"
-      ];
-      const defaultTools = [
-        "VS Code", "IntelliJ", "Git", "Docker", "AWS", "Firebase", "Next.js", "React", "Vue", "Angular"
-      ];
-      
-      const defaultPrefs = {
-        uid: user.uid, // Add this line
-        commonLanguages: defaultLanguages.map(lang => ({
-          name: lang,
-          count: 0,
-          lastUsed: null,
-          isFavorite: false
-        })),
-        commonTools: defaultTools.map(tool => ({
-          name: tool,
-          count: 0,
-          lastUsed: null,
-          isFavorite: false
-        })),
-        lastUpdated: new Date() // Add this line
-      };
-      
-      try {
-        await setDoc(doc(db, 'userPreferences', user.uid), defaultPrefs);
-        setUserPreferences(defaultPrefs);
-        console.log('Created default preferences successfully');
-      } catch (createError) {
-        console.error('Failed to create preferences:', createError);
-        // If creation fails, set empty preferences to prevent errors
+  // Load user preferences
+  const loadUserPreferences = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const prefsDoc = await getDoc(doc(db, 'userPreferences', user.uid));
+      if (prefsDoc.exists()) {
+        const data = prefsDoc.data();
         setUserPreferences({
-          commonLanguages: [],
-          commonTools: []
+          commonLanguages: data.commonLanguages || [],
+          commonTools: data.commonTools || []
         });
+      } else {
+        // Initialize with default preferences if none exist
+        const defaultLanguages = [
+          "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "Go", "Rust", "PHP", "Ruby"
+        ];
+        const defaultTools = [
+          "VS Code", "IntelliJ", "Git", "Docker", "AWS", "Firebase", "Next.js", "React", "Vue", "Angular"
+        ];
+        
+        const defaultPrefs = {
+          uid: user.uid,
+          commonLanguages: defaultLanguages.map(lang => ({
+            name: lang,
+            count: 0,
+            lastUsed: null,
+            isFavorite: false
+          })),
+          commonTools: defaultTools.map(tool => ({
+            name: tool,
+            count: 0,
+            lastUsed: null,
+            isFavorite: false
+          })),
+          lastUpdated: new Date()
+        };
+        
+        try {
+          await setDoc(doc(db, 'userPreferences', user.uid), defaultPrefs);
+          setUserPreferences(defaultPrefs);
+          console.log('Created default preferences successfully');
+        } catch (createError) {
+          console.error('Failed to create preferences:', createError);
+          // If creation fails, set empty preferences to prevent errors
+          setUserPreferences({
+            commonLanguages: [],
+            commonTools: []
+          });
+        }
       }
+    } catch (error) {
+      console.error('Error loading user preferences:', error);
+      // Set empty preferences to prevent crashes
+      setUserPreferences({
+        commonLanguages: [],
+        commonTools: []
+      });
     }
-  } catch (error) {
-    console.error('Error loading user preferences:', error);
-    // Set empty preferences to prevent crashes
-    setUserPreferences({
-      commonLanguages: [],
-      commonTools: []
-    });
-  }
-}, [user]);
-  
-  const loadTodayEntry = useCallback(async () => {
+  }, [user]);
+
+  // Load entry for selected date
+  const loadEntry = useCallback(async () => {
+    if (!user || !selectedDate) return;
+    
     try {
       setLoading(true);
       const entryDoc = await getDoc(doc(db, 'entries', entryId));
@@ -114,21 +120,43 @@ const loadUserPreferences = useCallback(async () => {
           tools: data.tools || [],
           learned: data.learned || ''
         });
+      } else {
+        // Clear form for new entry
+        setFormData({
+          minutes: '',
+          workedOn: '',
+          languages: [],
+          tools: [],
+          learned: ''
+        });
       }
     } catch (error) {
       console.error('Error loading entry:', error);
-      toast.error('Failed to load todays entry');
+      toast.error('Failed to load entry for selected date');
     } finally {
       setLoading(false);
     }
-  }, [entryId]);
-  
+  }, [user, selectedDate, entryId]);
+
+  // Handle date changes
+  const handleDateChange = (newDate) => {
+    setSelectedDate(newDate);
+    // Clear form when date changes
+    setFormData({
+      minutes: '',
+      workedOn: '',
+      languages: [],
+      tools: [],
+      learned: ''
+    });
+  };
+
   useEffect(() => {
     if (user) {
       loadUserPreferences();
-      loadTodayEntry();
+      loadEntry();
     }
-  }, [user, loadUserPreferences, loadTodayEntry]);
+  }, [user, loadUserPreferences, loadEntry]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -142,7 +170,7 @@ const loadUserPreferences = useCallback(async () => {
     try {
       await setDoc(doc(db, 'entries', entryId), {
         uid: user.uid,
-        date: today,
+        date: selectedDate,
         minutes: parseInt(formData.minutes),
         workedOn: formData.workedOn,
         languages: formData.languages,
@@ -159,7 +187,6 @@ const loadUserPreferences = useCallback(async () => {
       
       // Trigger confetti animation
       if (typeof window !== 'undefined') {
-        // const confetti = require('canvas-confetti');
         confetti({
           particleCount: 100,
           spread: 70,
@@ -248,7 +275,7 @@ const loadUserPreferences = useCallback(async () => {
         setUserPreferences(prev => ({ ...prev, commonTools: sortedTools }));
       }
       
-      toast.success(`${name} ${type === 'language' ? 'language' : 'tool'} ${type === 'language' ? 'favorited' : 'favorited'}!`);
+      toast.success(`${name} ${type === 'language' ? 'language' : 'tool'} favorited!`);
     } catch (error) {
       console.error('Error toggling favorite:', error);
       toast.error('Failed to update favorite');
@@ -388,13 +415,55 @@ const loadUserPreferences = useCallback(async () => {
     );
   }
 
+  // Helper functions for page title and description
+  const isToday = selectedDate === format(new Date(), 'yyyy-MM-dd');
+  const isPastDate = selectedDate < format(new Date(), 'yyyy-MM-dd');
+  const isFutureDate = selectedDate > format(new Date(), 'yyyy-MM-dd');
+
+  const getPageTitle = () => {
+    if (isToday) return "Log Today's Progress";
+    if (isPastDate) return "Log Past Progress";
+    if (isFutureDate) return "Log Future Progress";
+    return "Log Progress";
+  };
+
+  const getPageDescription = () => {
+    if (isToday) return `${selectedDate} • ${formData.minutes ? 'Editing today\'s entry' : 'New entry'}`;
+    if (isPastDate) return `${selectedDate} • ${formData.minutes ? 'Editing past entry' : 'New entry for past date'}`;
+    if (isFutureDate) return `${selectedDate} • ${formData.minutes ? 'Editing future entry' : 'New entry for future date'}`;
+    return `${selectedDate} • ${formData.minutes ? 'Editing entry' : 'New entry'}`;
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Log Today&apos;s Progress</h1>
+        <h1 className="text-3xl font-bold mb-2">{getPageTitle()}</h1>
         <p className="text-muted-foreground">
-          {today} • {formData.minutes ? 'Editing today&apos;s entry' : 'New entry'}
+          {getPageDescription()}
         </p>
+        
+        {/* Date Picker */}
+        <div className="mt-4">
+          <Label htmlFor="date-picker">Select Date</Label>
+          <Input
+            id="date-picker"
+            type="date"
+            value={selectedDate}
+            onChange={(e) => handleDateChange(e.target.value)}
+            max={format(new Date(), 'yyyy-MM-dd')} // Prevent future dates for now
+            className="mt-2 max-w-xs"
+          />
+          {isToday && (
+            <p className="text-xs text-muted-foreground mt-1">
+              📅 Currently viewing today's entry
+            </p>
+          )}
+          {isPastDate && (
+            <p className="text-xs text-muted-foreground mt-1">
+              📅 Viewing entry for {selectedDate}
+            </p>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -408,7 +477,7 @@ const loadUserPreferences = useCallback(async () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Minutes */}
             <div className="space-y-2">
-              <Label htmlFor="minutes">Minutes Coded Today</Label>
+              <Label htmlFor="minutes">Minutes Coded {isToday ? 'Today' : 'on ' + selectedDate}</Label>
               <Input
                 id="minutes"
                 type="number"

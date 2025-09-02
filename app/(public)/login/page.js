@@ -37,6 +37,40 @@ export default function LoginPage() {
           goalDays: 30
         });
         
+        // Initialize user preferences with default tools and languages
+        const defaultLanguages = [
+          { name: "JavaScript", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "TypeScript", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Python", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Java", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "C++", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "C#", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Go", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Rust", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "PHP", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Ruby", count: 0, lastUsed: new Date(), isFavorite: false }
+        ];
+
+        const defaultTools = [
+          { name: "VS Code", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "IntelliJ", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Git", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Docker", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "AWS", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Firebase", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Next.js", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "React", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Vue", count: 0, lastUsed: new Date(), isFavorite: false },
+          { name: "Angular", count: 0, lastUsed: new Date(), isFavorite: false }
+        ];
+
+        await setDoc(doc(db, 'userPreferences', user.uid), {
+          uid: user.uid,
+          commonLanguages: defaultLanguages,
+          commonTools: defaultTools,
+          lastUpdated: new Date()
+        });
+        
         toast.success('Account created successfully!');
       } else {
         // Sign in

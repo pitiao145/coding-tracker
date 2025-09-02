@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { X } from 'lucide-react';
+import { X, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
-// Common languages and tools for quick selection
-const commonLanguages = ['JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Go', 'Rust', 'PHP', 'Ruby', 'Swift', 'Kotlin'];
-const commonTools = ['VS Code', 'IntelliJ', 'Git', 'Docker', 'AWS', 'Firebase', 'Next.js', 'React', 'Vue', 'Angular', 'Node.js', 'PostgreSQL'];
 
 export default function NewEntryPage() {
   const { user } = useAuth();
@@ -35,10 +32,74 @@ export default function NewEntryPage() {
 
   const [customLanguage, setCustomLanguage] = useState('');
   const [customTool, setCustomTool] = useState('');
+  const [userPreferences, setUserPreferences] = useState({
+    commonLanguages: [],
+    commonTools: []
+  });
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const entryId = `${user?.uid}_${today}`;
 
+// Load user preferences
+const loadUserPreferences = useCallback(async () => {
+  if (!user) return;
+  
+  try {
+    const prefsDoc = await getDoc(doc(db, 'userPreferences', user.uid));
+    if (prefsDoc.exists()) {
+      const data = prefsDoc.data();
+      setUserPreferences({
+        commonLanguages: data.commonLanguages || [],
+        commonTools: data.commonTools || []
+      });
+    } else {
+      // Initialize with default preferences if none exist
+      const defaultLanguages = [
+        "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "Go", "Rust", "PHP", "Ruby"
+      ];
+      const defaultTools = [
+        "VS Code", "IntelliJ", "Git", "Docker", "AWS", "Firebase", "Next.js", "React", "Vue", "Angular"
+      ];
+      
+      const defaultPrefs = {
+        uid: user.uid, // Add this line
+        commonLanguages: defaultLanguages.map(lang => ({
+          name: lang,
+          count: 0,
+          lastUsed: null,
+          isFavorite: false
+        })),
+        commonTools: defaultTools.map(tool => ({
+          name: tool,
+          count: 0,
+          lastUsed: null,
+          isFavorite: false
+        })),
+        lastUpdated: new Date() // Add this line
+      };
+      
+      try {
+        await setDoc(doc(db, 'userPreferences', user.uid), defaultPrefs);
+        setUserPreferences(defaultPrefs);
+        console.log('Created default preferences successfully');
+      } catch (createError) {
+        console.error('Failed to create preferences:', createError);
+        // If creation fails, set empty preferences to prevent errors
+        setUserPreferences({
+          commonLanguages: [],
+          commonTools: []
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error loading user preferences:', error);
+    // Set empty preferences to prevent crashes
+    setUserPreferences({
+      commonLanguages: [],
+      commonTools: []
+    });
+  }
+}, [user]);
   
   const loadTodayEntry = useCallback(async () => {
     try {
@@ -56,7 +117,7 @@ export default function NewEntryPage() {
       }
     } catch (error) {
       console.error('Error loading entry:', error);
-      toast.error('Failed to load today&apos;s entry');
+      toast.error('Failed to load todays entry');
     } finally {
       setLoading(false);
     }
@@ -64,9 +125,10 @@ export default function NewEntryPage() {
   
   useEffect(() => {
     if (user) {
+      loadUserPreferences();
       loadTodayEntry();
     }
-  }, [user, loadTodayEntry]);
+  }, [user, loadUserPreferences, loadTodayEntry]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,6 +151,9 @@ export default function NewEntryPage() {
         createdAt: new Date(),
         updatedAt: new Date()
       });
+
+      // Update usage counts for selected languages and tools
+      await updateUsageCounts(formData.languages, formData.tools);
 
       toast.success('Entry saved successfully! 🎉');
       
@@ -146,6 +211,170 @@ export default function NewEntryPage() {
       ...prev,
       tools: prev.tools.filter(t => t !== tool)
     }));
+  };
+
+  const toggleFavorite = async (type, name) => {
+    try {
+      const prefsRef = doc(db, 'userPreferences', user.uid);
+      const currentPrefs = userPreferences;
+      
+      if (type === 'language') {
+        const updatedLanguages = currentPrefs.commonLanguages.map(lang => 
+          lang.name === name ? { ...lang, isFavorite: !lang.isFavorite } : lang
+        );
+        
+        // Sort: favorites first, then by count, then by lastUsed
+        const sortedLanguages = updatedLanguages.sort((a, b) => {
+          if (a.isFavorite !== b.isFavorite) return b.isFavorite ? 1 : -1;
+          if (a.count !== b.count) return b.count - a.count;
+          return new Date(b.lastUsed) - new Date(a.lastUsed);
+        }).slice(0, 10); // Keep only top 10
+        
+        await updateDoc(prefsRef, { commonLanguages: sortedLanguages });
+        setUserPreferences(prev => ({ ...prev, commonLanguages: sortedLanguages }));
+      } else {
+        const updatedTools = currentPrefs.commonTools.map(tool => 
+          tool.name === name ? { ...tool, isFavorite: !tool.isFavorite } : tool
+        );
+        
+        // Sort: favorites first, then by count, then by lastUsed
+        const sortedTools = updatedTools.sort((a, b) => {
+          if (a.isFavorite !== b.isFavorite) return b.isFavorite ? 1 : -1;
+          if (a.count !== b.count) return b.count - a.count;
+          return new Date(b.lastUsed) - new Date(a.lastUsed);
+        }).slice(0, 10); // Keep only top 10
+        
+        await updateDoc(prefsRef, { commonTools: sortedTools });
+        setUserPreferences(prev => ({ ...prev, commonTools: sortedTools }));
+      }
+      
+      toast.success(`${name} ${type === 'language' ? 'language' : 'tool'} ${type === 'language' ? 'favorited' : 'favorited'}!`);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+    }
+  };
+
+  const addCustomItem = async (type, name) => {
+    if (!name.trim()) return;
+    
+    try {
+      const prefsRef = doc(db, 'userPreferences', user.uid);
+      const currentPrefs = userPreferences;
+      
+      if (type === 'language') {
+        const newLanguage = {
+          name: name.trim(),
+          count: 1,
+          lastUsed: new Date(),
+          isFavorite: false
+        };
+        
+        const updatedLanguages = [...currentPrefs.commonLanguages, newLanguage]
+          .sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) return b.isFavorite ? 1 : -1;
+            if (a.count !== b.count) return b.count - a.count;
+            return new Date(b.lastUsed) - new Date(a.lastUsed);
+          })
+          .slice(0, 10); // Keep only top 10
+        
+        await updateDoc(prefsRef, { commonLanguages: updatedLanguages });
+        setUserPreferences(prev => ({ ...prev, commonLanguages: updatedLanguages }));
+      } else {
+        const newTool = {
+          name: name.trim(),
+          count: 1,
+          lastUsed: new Date(),
+          isFavorite: false
+        };
+        
+        const updatedTools = [...currentPrefs.commonTools, newTool]
+          .sort((a, b) => {
+            if (a.isFavorite !== b.isFavorite) return b.isFavorite ? 1 : -1;
+            if (a.count !== b.count) return b.count - a.count;
+            return new Date(b.lastUsed) - new Date(a.lastUsed);
+          })
+          .slice(0, 10); // Keep only top 10
+        
+        await updateDoc(prefsRef, { commonTools: updatedTools });
+        setUserPreferences(prev => ({ ...prev, commonTools: updatedTools }));
+      }
+      
+      if (type === 'language') {
+        addLanguage(name.trim());
+      } else {
+        addTool(name.trim());
+      }
+      
+      toast.success(`Added ${name} to your ${type === 'language' ? 'languages' : 'tools'}!`);
+    } catch (error) {
+      console.error('Error adding custom item:', error);
+      toast.error('Failed to add custom item');
+    }
+  };
+
+  const updateUsageCounts = async (languages, tools) => {
+    try {
+      const prefsRef = doc(db, 'userPreferences', user.uid);
+      const currentPrefs = userPreferences;
+      
+      // Update language counts
+      const updatedLanguages = currentPrefs.commonLanguages.map(lang => {
+        if (languages.includes(lang.name)) {
+          return {
+            ...lang,
+            count: lang.count + 1,
+            lastUsed: new Date()
+          };
+        }
+        return lang;
+      });
+      
+      // Update tool counts
+      const updatedTools = currentPrefs.commonTools.map(tool => {
+        if (tools.includes(tool.name)) {
+          return {
+            ...tool,
+            count: tool.count + 1,
+            lastUsed: new Date()
+          };
+        }
+        return tool;
+      });
+      
+      // Sort and limit to top 10
+      const sortedLanguages = updatedLanguages
+        .sort((a, b) => {
+          if (a.isFavorite !== b.isFavorite) return b.isFavorite ? 1 : -1;
+          if (a.count !== b.count) return b.count - a.count;
+          return new Date(b.lastUsed) - new Date(a.lastUsed);
+        })
+        .slice(0, 10);
+      
+      const sortedTools = updatedTools
+        .sort((a, b) => {
+          if (a.isFavorite !== b.isFavorite) return b.isFavorite ? 1 : -1;
+          if (a.count !== b.count) return b.count - a.count;
+          return new Date(b.lastUsed) - new Date(a.lastUsed);
+        })
+        .slice(0, 10);
+      
+      // Update preferences
+      await updateDoc(prefsRef, {
+        commonLanguages: sortedLanguages,
+        commonTools: sortedTools,
+        lastUpdated: new Date()
+      });
+      
+      // Update local state
+      setUserPreferences(prev => ({
+        ...prev,
+        commonLanguages: sortedLanguages,
+        commonTools: sortedTools
+      }));
+    } catch (error) {
+      console.error('Error updating usage counts:', error);
+    }
   };
 
   if (loading) {
@@ -213,21 +442,36 @@ export default function NewEntryPage() {
               <Label>Languages Used</Label>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {commonLanguages.map(lang => (
+                  {userPreferences.commonLanguages.map(lang => (
                     <Button
-                      key={lang}
+                      key={lang.name}
                       type="button"
-                      variant={formData.languages.includes(lang) ? "default" : "outline"}
+                      variant={formData.languages.includes(lang.name) ? "default" : "outline"}
                       size="sm"
                       onClick={() => {
-                        if (formData.languages.includes(lang)) {
-                          removeLanguage(lang);
+                        if (formData.languages.includes(lang.name)) {
+                          removeLanguage(lang.name);
                         } else {
-                          addLanguage(lang);
+                          addLanguage(lang.name);
                         }
                       }}
+                      className="relative group"
                     >
-                      {lang}
+                      {lang.name}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite('language', lang.name);
+                        }}
+                        className={`ml-2 p-1 rounded-full transition-colors ${
+                          lang.isFavorite 
+                            ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                            : 'bg-transparent text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                        }`}
+                      >
+                        <Star className={`h-3 w-3 ${lang.isFavorite ? 'fill-current' : ''}`} />
+                      </button>
                     </Button>
                   ))}
                 </div>
@@ -239,14 +483,14 @@ export default function NewEntryPage() {
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        addLanguage(customLanguage);
+                        addCustomItem('language', customLanguage);
                       }
                     }}
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => addLanguage(customLanguage)}
+                    onClick={() => addCustomItem('language', customLanguage)}
                   >
                     Add
                   </Button>
@@ -270,21 +514,36 @@ export default function NewEntryPage() {
               <Label>Tools Used</Label>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {commonTools.map(tool => (
+                  {userPreferences.commonTools.map(tool => (
                     <Button
-                      key={tool}
+                      key={tool.name}
                       type="button"
-                      variant={formData.tools.includes(tool) ? "default" : "outline"}
+                      variant={formData.tools.includes(tool.name) ? "default" : "outline"}
                       size="sm"
                       onClick={() => {
-                        if (formData.tools.includes(tool)) {
-                          removeTool(tool);
+                        if (formData.tools.includes(tool.name)) {
+                          removeTool(tool.name);
                         } else {
-                          addTool(tool);
+                          addTool(tool.name);
                         }
                       }}
+                      className="relative group"
                     >
-                      {tool}
+                      {tool.name}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite('tool', tool.name);
+                        }}
+                        className={`ml-2 p-1 rounded-full transition-colors ${
+                          tool.isFavorite 
+                            ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                            : 'bg-transparent text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                        }`}
+                      >
+                        <Star className={`h-3 w-3 ${tool.isFavorite ? 'fill-current' : ''}`} />
+                      </button>
                     </Button>
                   ))}
                 </div>
@@ -296,14 +555,14 @@ export default function NewEntryPage() {
                     onKeyPress={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        addTool(customTool);
+                        addCustomItem('tool', customTool);
                       }
                     }}
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => addTool(customTool)}
+                    onClick={() => addCustomItem('tool', customTool)}
                   >
                     Add
                   </Button>

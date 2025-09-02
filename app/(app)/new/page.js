@@ -455,7 +455,7 @@ export default function NewEntryPage() {
           />
           {isToday && (
             <p className="text-xs text-muted-foreground mt-1">
-              📅 Currently viewing today's entry
+              📅 Currently viewing today&apos;s entry
             </p>
           )}
           {isPastDate && (

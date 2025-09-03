@@ -89,10 +89,10 @@ export default function EntryDetailPage({ params }) {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <Link href="/dashboard">
+        <Link href="/entries">
           <Button variant="ghost" className="flex items-center gap-2 mb-4">
             <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
+            Back to Entries
           </Button>
         </Link>
         <h1 className="text-3xl font-bold mb-2">Entry Details</h1>

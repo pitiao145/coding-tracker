@@ -152,6 +152,9 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground">
             {Math.round(progressPercentage)}% complete
           </p>
+          <Link href="/entries">
+            <Button size="sm" className="mt-2 hover:cursor-pointer">View Entries</Button>
+          </Link>
         </CardContent>
       </Card>
 
@@ -166,7 +169,7 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold">{todayEntry?.minutes || 0} min</div>
             {!todayEntry && (
               <Link href="/new">
-                <Button size="sm" className="mt-2">Log Today</Button>
+                <Button size="sm" className="mt-2 hover:cursor-pointer">Log Today</Button>
               </Link>
             )}
           </CardContent>

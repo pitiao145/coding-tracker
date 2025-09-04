@@ -112,7 +112,7 @@ export default function EntryDetailPage({ params }) {
               </CardDescription>
             </div>
             <div className="flex gap-2">
-              <Link href={`/new`}>
+              <Link href={`/new?date=${entry.date}`}>
                 <Button size="sm" variant="outline" className="flex items-center gap-2">
                   <Edit className="h-4 w-4" />
                   Edit

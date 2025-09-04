@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -19,8 +19,10 @@ import confetti from 'canvas-confetti';
 export default function NewEntryPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   
   const [formData, setFormData] = useState({
     minutes: '',
@@ -37,12 +39,17 @@ export default function NewEntryPage() {
     commonTools: []
   });
 
-  // Add date state - default to today
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  // Initialize date from URL params or default to today
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      return dateParam;
+    }
+    return format(new Date(), 'yyyy-MM-dd');
+  });
   
   // Generate entry ID based on selected date
   const entryId = user ? `${user.uid}_${selectedDate}` : '';
-
   // Load user preferences
   const loadUserPreferences = useCallback(async () => {
     if (!user) return;
@@ -110,8 +117,11 @@ export default function NewEntryPage() {
     
     try {
       setLoading(true);
+      console.log('Entry ID before getDoc:', entryId);
       const entryDoc = await getDoc(doc(db, 'entries', entryId));
+      console.log('Entry doc:', entryDoc);
       if (entryDoc.exists()) {
+        console.log('Entry found');
         const data = entryDoc.data();
         setFormData({
           minutes: data.minutes?.toString() || '',
@@ -120,8 +130,10 @@ export default function NewEntryPage() {
           tools: data.tools || [],
           learned: data.learned || ''
         });
+        setIsEditing(true);
       } else {
         // Clear form for new entry
+        console.log('Entry not found, clearing form');
         setFormData({
           minutes: '',
           workedOn: '',
@@ -129,6 +141,7 @@ export default function NewEntryPage() {
           tools: [],
           learned: ''
         });
+        setIsEditing(false);
       }
     } catch (error) {
       console.error('Error loading entry:', error);
@@ -136,7 +149,7 @@ export default function NewEntryPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, selectedDate, entryId]);
+  }, [user, selectedDate, entryId, searchParams]);
 
   // Handle date changes
   const handleDateChange = (newDate) => {
@@ -149,6 +162,7 @@ export default function NewEntryPage() {
       tools: [],
       learned: ''
     });
+    setIsEditing(false);
   };
 
   useEffect(() => {
@@ -156,7 +170,23 @@ export default function NewEntryPage() {
       loadUserPreferences();
       loadEntry();
     }
-  }, [user, loadUserPreferences, loadEntry]);
+  }, [user, loadUserPreferences, loadEntry, searchParams]);
+
+  // Handle URL parameter changes
+  useEffect(() => {
+    const dateParam = searchParams.get('date');
+    if (dateParam && dateParam !== selectedDate) {
+      setSelectedDate(dateParam);
+      // Clear form when date changes from URL
+      setFormData({
+        minutes: '',
+        workedOn: '',
+        languages: [],
+        tools: [],
+        learned: ''
+      });
+    }
+  }, [searchParams, selectedDate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -183,7 +213,7 @@ export default function NewEntryPage() {
       // Update usage counts for selected languages and tools
       await updateUsageCounts(formData.languages, formData.tools);
 
-      toast.success('Entry saved successfully! 🎉');
+      toast.success(isEditing ? 'Entry updated successfully! 🎉' : 'Entry created successfully! 🎉');
       
       // Trigger confetti animation
       if (typeof window !== 'undefined') {
@@ -421,17 +451,29 @@ export default function NewEntryPage() {
   const isFutureDate = selectedDate > format(new Date(), 'yyyy-MM-dd');
 
   const getPageTitle = () => {
-    if (isToday) return "Log Today's Progress";
-    if (isPastDate) return "Log Past Progress";
-    if (isFutureDate) return "Log Future Progress";
-    return "Log Progress";
+    if (isToday) {
+      return isEditing ? "Edit Today's Progress" : "Log Today's Progress";
+    }
+    if (isPastDate) {
+      return isEditing ? "Edit Past Progress" : "Log Past Progress";
+    }
+    if (isFutureDate) {
+      return isEditing ? "Edit Future Progress" : "Log Future Progress";
+    }
+    return isEditing ? "Edit Progress" : "Log Progress";
   };
 
   const getPageDescription = () => {
-    if (isToday) return `${selectedDate} • ${formData.minutes ? 'Editing today\'s entry' : 'New entry'}`;
-    if (isPastDate) return `${selectedDate} • ${formData.minutes ? 'Editing past entry' : 'New entry for past date'}`;
-    if (isFutureDate) return `${selectedDate} • ${formData.minutes ? 'Editing future entry' : 'New entry for future date'}`;
-    return `${selectedDate} • ${formData.minutes ? 'Editing entry' : 'New entry'}`;
+    if (isToday) {
+      return `${selectedDate} • ${isEditing ? 'Editing today\'s entry' : 'New entry'}`;
+    }
+    if (isPastDate) {
+      return `${selectedDate} • ${isEditing ? 'Editing existing entry' : 'New entry for past date'}`;
+    }
+    if (isFutureDate) {
+      return `${selectedDate} • ${isEditing ? 'Editing future entry' : 'New entry for future date'}`;
+    }
+    return `${selectedDate} • ${isEditing ? 'Editing entry' : 'New entry'}`;
   };
 
   return (
@@ -451,7 +493,8 @@ export default function NewEntryPage() {
             value={selectedDate}
             onChange={(e) => handleDateChange(e.target.value)}
             max={format(new Date(), 'yyyy-MM-dd')} // Prevent future dates for now
-            className="mt-2 max-w-xs"
+            className={`mt-2 max-w-xs ${isEditing ? 'cursor-not-allowed' : ''}`}
+            disabled={isEditing}
           />
           {isToday && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -463,14 +506,19 @@ export default function NewEntryPage() {
               📅 Viewing entry for {selectedDate}
             </p>
           )}
+          {isEditing && (
+            <p className="text-xs text-blue-500 font-medium mt-1">
+              ✏️ Editing existing entry
+            </p>
+          )}
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Daily Coding Log</CardTitle>
+          <CardTitle>{isEditing ? 'Edit Daily Coding Log' : 'Daily Coding Log'}</CardTitle>
           <CardDescription>
-            Track what you worked on, learned, and the tools you used
+            {isEditing ? 'Update your existing entry' : 'Track what you worked on, learned, and the tools you used'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -485,7 +533,7 @@ export default function NewEntryPage() {
                 step="5"
                 value={formData.minutes}
                 onChange={(e) => setFormData(prev => ({ ...prev, minutes: e.target.value }))}
-                placeholder="e.g., 90"
+                placeholder={isEditing ? "Update minutes..." : "e.g., 90"}
                 required
               />
             </div>
@@ -497,7 +545,7 @@ export default function NewEntryPage() {
                 id="workedOn"
                 value={formData.workedOn}
                 onChange={(e) => setFormData(prev => ({ ...prev, workedOn: e.target.value }))}
-                placeholder="Describe what you built, fixed, or learned..."
+                placeholder={isEditing ? "Update what you worked on..." : "Describe what you built, fixed, or learned..."}
                 maxLength={500}
                 rows={3}
               />
@@ -512,28 +560,31 @@ export default function NewEntryPage() {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {userPreferences.commonLanguages.map(lang => (
-                    <Button
-                      key={lang.name}
-                      type="button"
-                      variant={formData.languages.includes(lang.name) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        if (formData.languages.includes(lang.name)) {
-                          removeLanguage(lang.name);
-                        } else {
-                          addLanguage(lang.name);
-                        }
-                      }}
-                      className="relative group"
-                    >
-                      {lang.name}
+                    <div className="relative group" key={lang.name}>
+                      <Button
+                        type="button"
+                        variant={formData.languages.includes(lang.name) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          if (formData.languages.includes(lang.name)) {
+                            removeLanguage(lang.name);
+                          } else {
+                            addLanguage(lang.name);
+                          }
+                        }}
+                        className="pr-7" // add padding right for the star button
+                      >
+                        {lang.name}
+                      </Button>
                       <button
                         type="button"
+                        tabIndex={-1}
+                        aria-label={lang.isFavorite ? "Unfavorite" : "Favorite"}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleFavorite('language', lang.name);
                         }}
-                        className={`ml-2 p-1 rounded-full transition-colors ${
+                        className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors ${
                           lang.isFavorite 
                             ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
                             : 'bg-transparent text-gray-400 hover:bg-gray-200 hover:text-gray-600'
@@ -541,12 +592,12 @@ export default function NewEntryPage() {
                       >
                         <Star className={`h-3 w-3 ${lang.isFavorite ? 'fill-current' : ''}`} />
                       </button>
-                    </Button>
+                    </div>
                   ))}
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add custom language..."
+                    placeholder={isEditing ? "Add new language..." : "Add custom language..."}
                     value={customLanguage}
                     onChange={(e) => setCustomLanguage(e.target.value)}
                     onKeyPress={(e) => {
@@ -561,7 +612,7 @@ export default function NewEntryPage() {
                     variant="outline"
                     onClick={() => addCustomItem('language', customLanguage)}
                   >
-                    Add
+                    {isEditing ? 'Add New' : 'Add'}
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -584,41 +635,45 @@ export default function NewEntryPage() {
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
                   {userPreferences.commonTools.map(tool => (
-                    <Button
-                      key={tool.name}
-                      type="button"
-                      variant={formData.tools.includes(tool.name) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        if (formData.tools.includes(tool.name)) {
-                          removeTool(tool.name);
-                        } else {
-                          addTool(tool.name);
-                        }
-                      }}
-                      className="relative group"
-                    >
-                      {tool.name}
-                      <button
+                    <div className="relative group" key={tool.name}>
+                      <Button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite('tool', tool.name);
+                        variant={formData.tools.includes(tool.name) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          if (formData.tools.includes(tool.name)) {
+                            removeTool(tool.name);
+                          } else {
+                            addTool(tool.name);
+                          }
                         }}
-                        className={`ml-2 p-1 rounded-full transition-colors ${
-                          tool.isFavorite 
-                            ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
-                            : 'bg-transparent text-gray-400 hover:bg-gray-200 hover:text-gray-600'
-                        }`}
+                        className="pr-8" // add right padding for the favorite button
                       >
-                        <Star className={`h-3 w-3 ${tool.isFavorite ? 'fill-current' : ''}`} />
-                      </button>
-                    </Button>
+                        {tool.name}
+                      </Button>
+                      <span className="absolute right-1 top-1/2 -translate-y-1/2">
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite('tool', tool.name);
+                          }}
+                          className={`ml-2 p-1 rounded-full transition-colors ${
+                            tool.isFavorite 
+                              ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                              : 'bg-transparent text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                          }`}
+                        >
+                          <Star className={`h-3 w-3 ${tool.isFavorite ? 'fill-current' : ''}`} />
+                        </button>
+                      </span>
+                    </div>
                   ))}
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Add custom tool..."
+                    placeholder={isEditing ? "Add new tool..." : "Add custom tool..."}
                     value={customTool}
                     onChange={(e) => setCustomTool(e.target.value)}
                     onKeyPress={(e) => {
@@ -633,7 +688,7 @@ export default function NewEntryPage() {
                     variant="outline"
                     onClick={() => addCustomItem('tool', customTool)}
                   >
-                    Add
+                    {isEditing ? 'Add New' : 'Add'}
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -657,7 +712,7 @@ export default function NewEntryPage() {
                 id="learned"
                 value={formData.learned}
                 onChange={(e) => setFormData(prev => ({ ...prev, learned: e.target.value }))}
-                placeholder="Share your key learnings, insights, or discoveries..."
+                placeholder={isEditing ? "Update your learnings..." : "Share your key learnings, insights, or discoveries..."}
                 maxLength={500}
                 rows={3}
               />
@@ -673,14 +728,14 @@ export default function NewEntryPage() {
                 className="flex-1"
                 disabled={saving}
               >
-                {saving ? 'Saving...' : 'Save Entry'}
+                {saving ? 'Saving...' : (isEditing ? 'Update Entry' : 'Save Entry')}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push('/dashboard')}
               >
-                Cancel
+                {isEditing ? 'Cancel Edit' : 'Cancel'}
               </Button>
             </div>
           </form>

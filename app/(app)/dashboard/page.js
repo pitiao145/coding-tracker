@@ -28,13 +28,16 @@ export default function DashboardPage() {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quote] = useState(quotes[Math.floor(Math.random() * quotes.length)]);
+  
   const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
       // Fetch user data
       const userDoc = await getDocs(query(collection(db, 'users'), where('__name__', '==', user.uid)));
       if (!userDoc.empty) {
         setUserData(userDoc.docs[0].data());
       }
+
 
       // Fetch entries
       const entriesQuery = query(

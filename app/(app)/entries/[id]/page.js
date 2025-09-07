@@ -113,8 +113,8 @@ export default function EntryDetailPage({ params }) {
             </div>
             <div className="flex gap-2">
               <Link href={`/new?date=${entry.date}`}>
-                <Button size="sm" variant="outline" className="flex items-center gap-2">
-                  <Edit className="h-4 w-4" />
+                <Button size="sm" variant="outline" className="flex items-center gap-2 hover:cursor-pointer">
+                  <Edit className="h-4 w-4 " />
                   Edit
                 </Button>
               </Link>
@@ -122,7 +122,7 @@ export default function EntryDetailPage({ params }) {
                 size="sm" 
                 variant="destructive" 
                 onClick={handleDelete}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 hover:cursor-pointer"
               >
                 <Trash2 className="h-4 w-4" />
                 Delete

@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { X, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 export default function NewEntryPage() {
   const { user } = useAuth();
@@ -478,6 +480,14 @@ export default function NewEntryPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {isEditing && <div className="mb-6">
+          <Link href={`/entries/${entryId}`}>
+            <Button variant="ghost" className="flex items-center gap-2 mb-4">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Entry
+            </Button>
+          </Link>
+        </div>}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">{getPageTitle()}</h1>
         <p className="text-muted-foreground">
@@ -725,13 +735,14 @@ export default function NewEntryPage() {
             <div className="flex gap-4">
               <Button
                 type="submit"
-                className="flex-1"
+                className="flex-1 hover:cursor-pointer"
                 disabled={saving}
               >
                 {saving ? 'Saving...' : (isEditing ? 'Update Entry' : 'Save Entry')}
               </Button>
               <Button
                 type="button"
+                className="hover:cursor-pointer"
                 variant="outline"
                 onClick={() => router.push('/dashboard')}
               >

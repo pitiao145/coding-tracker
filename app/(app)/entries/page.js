@@ -16,6 +16,8 @@ import { db } from "@/lib/firebase";
 import { useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { BookOpen, Clock, PencilRuler } from "lucide-react";
 
 export default function EntriesPage() {
   const { user } = useAuth();
@@ -42,6 +44,7 @@ export default function EntriesPage() {
     }
   }, [user]);
 
+
   useEffect(() => {
     if (user) {
       fetchEntries();
@@ -50,14 +53,14 @@ export default function EntriesPage() {
 
   return (
     <div className="max-w-2xl mx-auto py-8">
-        <div className="mb-6">
-          <Link href="/dashboard">
-            <Button variant="ghost" className="flex items-center gap-2 mb-4">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Button>
-          </Link>
-        </div>
+      <div className="mb-6">
+        <Link href="/dashboard">
+          <Button variant="ghost" className="flex items-center gap-2 mb-4">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </Link>
+      </div>
       <h1 className="text-3xl font-bold mb-4">Your Coding Challenge Entries</h1>
       <p className="text-muted-foreground mb-8">
         View all your daily coding logs below.
@@ -81,37 +84,54 @@ export default function EntriesPage() {
           .map((entry) => (
             <Card key={entry.id || entry.date}>
               <CardHeader>
-                <CardTitle>
-                  {format(parseISO(entry.date), "MMMM d, yyyy")}
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+
+                  <span>{format(parseISO(entry.date), "MMMM d, yyyy")}</span>
                 </CardTitle>
                 <CardDescription>{entry.minutes} minutes coded</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="mb-2">
+                <div className="mb-2 flex items-center gap-2">
+                  <PencilRuler className="h-4 w-4" />
                   <span className="font-semibold">What you worked on:</span>
-                  <div className="ml-2">
-                    {entry.workedOn || (
-                      <span className="text-muted-foreground">No details</span>
+                </div>
+                <div className="ml-2">
+                  {entry.workedOn || (
+                    <span className="text-muted-foreground">No details</span>
+                  )}
+                </div>
+                <div className="my-4">
+                  <h3 className="font-semibold mb-2 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Tools Used
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    
+                    {entry.tools && entry.tools.length > 0 ? (
+                      entry.tools.map((tool) => (
+                        <Badge key={tool} variant="outline">
+                          {tool}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">
+                        No tools specified
+                      </p>
                     )}
                   </div>
                 </div>
-                {entry.tools && (
-                  <div className="mb-2">
-                    <span className="font-semibold">Tools used:</span>
-                    <div className="ml-2">{entry.tools}</div>
-                  </div>
-                )}
                 {entry.notes && (
                   <div>
                     <span className="font-semibold">Notes:</span>
                     <div className="ml-2">{entry.notes}</div>
                   </div>
                 )}
-              <Link href={`/entries/${entry.id}`}>
-                <Button size="sm" className="mt-2">
-                  Edit entry
-                </Button>
-              </Link>
+                <Link href={`/entries/${entry.id}`}>
+                  <Button size="sm" className="mt-2 hover:cursor-pointer">
+                    Edit entry
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           ))}

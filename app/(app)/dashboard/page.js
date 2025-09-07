@@ -12,7 +12,8 @@ import { Separator } from '@/components/ui/separator';
 import { Calendar, Clock, Target, TrendingUp, Code, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { format, subDays, startOfDay } from 'date-fns';
-
+import WordcloudGenerator from '@/components/graphical/WordcloudGenerator';
+import { ParentSize } from '@visx/responsive';
 // Motivational quotes
 const quotes = [
   { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
@@ -110,6 +111,19 @@ export default function DashboardPage() {
     }
     return acc;
   }, {});
+
+    //To help display tools in the wordcloud.
+    const toolData = Object.entries(tools).map(([lang, count]) => ({
+      text: lang,
+      value: count,
+    }));
+
+        //To help display languages in the wordcloud.
+  const languageData = Object.entries(languages).map(([lang, count]) => ({
+    text: lang,
+    value: count,
+  }));
+
 
   if (loading) {
     return (
@@ -216,6 +230,22 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
+            <div style={{ width: "100%", height: 400 }}>
+                      <ParentSize>
+                        {({ width, height }) =>
+                          width > 0 && height > 0 ? (
+                            <WordcloudGenerator
+                              width={width}
+                              height={height}
+                              showControls={false}
+                              data={languageData}
+                              rotation={false}
+                              typeOfSpiral="archimedean"
+                            />
+                          ) : null
+                        }
+                      </ParentSize>
+                    </div>
               {Object.entries(languages).map(([lang, count]) => (
                 <Badge key={lang} variant="secondary">
                   {lang} ({count})
@@ -237,6 +267,22 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
+            <div style={{ width: "100%", height: 400 }}>
+                      <ParentSize>
+                        {({ width, height }) =>
+                          width > 0 && height > 0 ? (
+                            <WordcloudGenerator
+                              width={width}
+                              height={height}
+                              showControls={false}
+                              data={toolData}
+                              rotation={false}
+                              typeOfSpiral="archimedean"
+                            />
+                          ) : null
+                        }
+                      </ParentSize>
+                    </div>
               {Object.entries(tools).map(([tool, count]) => (
                 <Badge key={tool} variant="outline">
                   {tool} ({count})

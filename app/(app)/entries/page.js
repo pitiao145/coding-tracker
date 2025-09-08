@@ -52,7 +52,7 @@ export default function EntriesPage() {
   }, [user, fetchEntries]);
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="w-5xl mx-auto py-8">
       <div className="mb-6">
         <Link href="/dashboard">
           <Button variant="ghost" className="flex items-center gap-2 mb-4">
@@ -78,11 +78,11 @@ export default function EntriesPage() {
           No entries found. Start logging your coding progress!
         </div>
       )}
-      <div className="space-y-6">
+      <div className="flex flex-row flex-wrap gap-4 justify-items-start items-stretch mx-auto">
         {entries
           .sort((a, b) => b.date.localeCompare(a.date)) // newest first
           .map((entry) => (
-            <Card key={entry.id || entry.date}>
+            <Card className="lg:w-[32%] md:w-[48%] w-[75%] min-w-O" key={entry.id || entry.date}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
@@ -129,7 +129,7 @@ export default function EntriesPage() {
                 )}
                 <Link href={`/entries/${entry.id}`}>
                   <Button size="sm" className="mt-2 hover:cursor-pointer">
-                    Edit entry
+                    View entry
                   </Button>
                 </Link>
               </CardContent>

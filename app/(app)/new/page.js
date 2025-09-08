@@ -119,9 +119,7 @@ export default function NewEntryPage() {
     
     try {
       setLoading(true);
-      console.log('Entry ID before getDoc:', entryId);
       const entryDoc = await getDoc(doc(db, 'entries', entryId));
-      console.log('Entry doc:', entryDoc);
       if (entryDoc.exists()) {
         console.log('Entry found');
         const data = entryDoc.data();

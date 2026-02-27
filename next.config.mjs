@@ -1,4 +1,23 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "",
+          },
+          {
+            key: "Content-Security-Policy",
+            value:
+              "frame-ancestors 'self' https://pierre-dev-seven.vercel.app http://localhost:5500 http://127.0.0.1:5500",
+          },
+        ],
+      },
+    ];
+  },
+};
 
 export default nextConfig;

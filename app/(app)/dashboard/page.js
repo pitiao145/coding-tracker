@@ -23,14 +23,16 @@ const quotes = [
   { text: "First, solve the problem. Then, write the code.", author: "John Johnson" }
 ];
 
-export default function DashboardPage() {
+export default function DashboardPage({ mockEntries, mockUserData, demoMode, mockTodayDate }) {
   const { user } = useAuth();
-  const [entries, setEntries] = useState([]);
-  const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [quote] = useState(quotes[Math.floor(Math.random() * quotes.length)]);
+  const [entries, setEntries] = useState(mockEntries ?? []);
+  const [userData, setUserData] = useState(mockUserData ?? null);
+  const [loading, setLoading] = useState(mockEntries === undefined);
+  // Use fixed quote in demo mode to avoid hydration mismatch (random differs server vs client)
+  const [quote] = useState(() => demoMode ? quotes[0] : quotes[Math.floor(Math.random() * quotes.length)]);
   
   const fetchData = useCallback(async () => {
+    if (mockEntries !== undefined) return;
     setLoading(true);
     try {
       // Fetch user data
@@ -54,7 +56,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, mockEntries]);
 
   useEffect(() => {
     if (user) {
@@ -68,16 +70,19 @@ export default function DashboardPage() {
   const uniqueDays = new Set(entries.map(entry => entry.date)).size;
   const progressPercentage = Math.min(100, (uniqueDays / (userData?.goalDays || 30)) * 100);
   
+  // Use fixed date in demo mode to avoid hydration mismatch
+  const todayStr = demoMode && mockTodayDate ? mockTodayDate : format(new Date(), 'yyyy-MM-dd');
+
   // Calculate streak
   const calculateStreak = () => {
     let streak = 0;
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const today = todayStr;
+    const yesterday = format(subDays(new Date(today + 'T12:00:00'), 1), 'yyyy-MM-dd');
     
     const entryDates = entries.map(e => e.date).sort().reverse();
     
     for (let i = 0; i < entryDates.length; i++) {
-      const expectedDate = i === 0 ? today : format(subDays(new Date(), i), 'yyyy-MM-dd');
+      const expectedDate = i === 0 ? today : format(subDays(new Date(today + 'T12:00:00'), i), 'yyyy-MM-dd');
       if (entryDates[i] === expectedDate || entryDates[i] === yesterday) {
         streak++;
       } else {
@@ -90,8 +95,7 @@ export default function DashboardPage() {
   const streak = calculateStreak();
 
   // Get today's entry
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const todayEntry = entries.find(entry => entry.date === today);
+  const todayEntry = entries.find(entry => entry.date === todayStr);
 
   // Get languages and tools distribution
   const languages = entries.reduce((acc, entry) => {
@@ -169,9 +173,15 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground">
             {Math.round(progressPercentage)}% complete
           </p>
-          <Link href="/entries">
-            <Button size="sm" className="mt-2 hover:cursor-pointer">View Entries</Button>
-          </Link>
+          {demoMode ? (
+            <Link href="/demo/entries">
+              <Button size="sm" className="mt-2 hover:cursor-pointer">View Entries</Button>
+            </Link>
+          ) : (
+            <Link href="/entries">
+              <Button size="sm" className="mt-2 hover:cursor-pointer">View Entries</Button>
+            </Link>
+          )}
         </CardContent>
       </Card>
 
@@ -184,9 +194,11 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{todayEntry?.minutes || 0} min</div>
-            {!todayEntry && (
-              <Link href="/new">
-                <Button size="sm" className="mt-2 hover:cursor-pointer">Log Today</Button>
+            {(demoMode || !todayEntry) && (
+              <Link href={demoMode ? "/demo/new" : "/new"}>
+                <Button size="sm" className="mt-2 hover:cursor-pointer">
+                  {demoMode && todayEntry ? "Edit Today" : "Log Today"}
+                </Button>
               </Link>
             )}
           </CardContent>

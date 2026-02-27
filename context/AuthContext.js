@@ -17,29 +17,42 @@ export const AuthProvider = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
 
+  // Demo route: provide fake user, no Firebase subscription (avoids setState loop)
   useEffect(() => {
+    if (pathname.startsWith('/demo')) {
+      setUser({
+        uid: 'demo-user',
+        email: 'demo@example.com',
+        displayName: 'Demo User'
+      });
+      setLoading(false);
+      return;
+    }
+    // When leaving demo, reset so auth effect can take over
+    setLoading(true);
+  }, [pathname]);
+
+  // Normal auth: only runs when not on demo path
+  useEffect(() => {
+    if (pathname.startsWith('/demo')) return;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
-      
-      // Handle redirects based on authentication state
-      if (!loading) {
-        if (user) {
-          // User is authenticated
-          if (pathname === '/login' || pathname === '/') {
-            router.push('/dashboard');
-          }
-        } else {
-          // User is not authenticated
-          if (pathname !== '/login' && pathname !== '/') {
-            router.push('/login');
-          }
+
+      if (user) {
+        if (pathname === '/login' || pathname === '/') {
+          router.push('/dashboard');
+        }
+      } else {
+        if (pathname !== '/login' && pathname !== '/') {
+          router.push('/login');
         }
       }
     });
 
     return () => unsubscribe();
-  }, [user, loading, router, pathname]);
+  }, [pathname, router]);
 
   const logout = async () => {
     try {

@@ -18,7 +18,16 @@ import confetti from 'canvas-confetti';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-export default function NewEntryPage() {
+const DEFAULT_DEMO_PREFERENCES = {
+  commonLanguages: [
+    "JavaScript", "TypeScript", "Python", "Java", "C++", "C#", "Go", "Rust", "PHP", "Ruby"
+  ].map(name => ({ name, count: 0, lastUsed: null, isFavorite: false })),
+  commonTools: [
+    "VS Code", "IntelliJ", "Git", "Docker", "AWS", "Firebase", "Next.js", "React", "Vue", "Angular"
+  ].map(name => ({ name, count: 0, lastUsed: null, isFavorite: false }))
+};
+
+export default function NewEntryPage({ demoMode }) {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,7 +64,10 @@ export default function NewEntryPage() {
   // Load user preferences
   const loadUserPreferences = useCallback(async () => {
     if (!user) return;
-    
+    if (demoMode) {
+      setUserPreferences(DEFAULT_DEMO_PREFERENCES);
+      return;
+    }
     try {
       const prefsDoc = await getDoc(doc(db, 'userPreferences', user.uid));
       if (prefsDoc.exists()) {
@@ -111,12 +123,17 @@ export default function NewEntryPage() {
         commonTools: []
       });
     }
-  }, [user]);
+  }, [user, demoMode]);
 
   // Load entry for selected date
   const loadEntry = useCallback(async () => {
     if (!user || !selectedDate) return;
-    
+    if (demoMode) {
+      setFormData({ minutes: '', workedOn: '', languages: [], tools: [], learned: '' });
+      setIsEditing(false);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const entryDoc = await getDoc(doc(db, 'entries', entryId));
@@ -149,7 +166,7 @@ export default function NewEntryPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, selectedDate, entryId, searchParams]);
+  }, [user, selectedDate, entryId, searchParams, demoMode]);
 
   // Handle date changes
   const handleDateChange = (newDate) => {
@@ -190,7 +207,7 @@ export default function NewEntryPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.minutes || formData.minutes < 0) {
       toast.error('Please enter valid minutes');
       return;
@@ -198,36 +215,31 @@ export default function NewEntryPage() {
 
     setSaving(true);
     try {
-      await setDoc(doc(db, 'entries', entryId), {
-        uid: user.uid,
-        date: selectedDate,
-        minutes: parseInt(formData.minutes),
-        workedOn: formData.workedOn,
-        languages: formData.languages,
-        tools: formData.tools,
-        learned: formData.learned,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-
-      // Update usage counts for selected languages and tools
-      await updateUsageCounts(formData.languages, formData.tools);
-
-      toast.success(isEditing ? 'Entry updated successfully! 🎉' : 'Entry created successfully! 🎉');
-      
-      // Trigger confetti animation
-      if (typeof window !== 'undefined') {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 }
+      if (demoMode) {
+        toast.success(isEditing ? 'Entry updated successfully! 🎉' : 'Entry created successfully! 🎉');
+        if (typeof window !== 'undefined') {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+        setTimeout(() => router.push('/demo'), 1500);
+      } else {
+        await setDoc(doc(db, 'entries', entryId), {
+          uid: user.uid,
+          date: selectedDate,
+          minutes: parseInt(formData.minutes),
+          workedOn: formData.workedOn,
+          languages: formData.languages,
+          tools: formData.tools,
+          learned: formData.learned,
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
+        await updateUsageCounts(formData.languages, formData.tools);
+        toast.success(isEditing ? 'Entry updated successfully! 🎉' : 'Entry created successfully! 🎉');
+        if (typeof window !== 'undefined') {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+        setTimeout(() => router.push('/dashboard'), 1500);
       }
-
-      // Redirect to dashboard after a short delay
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 1500);
     } catch (error) {
       console.error('Error saving entry:', error);
       toast.error('Failed to save entry');
@@ -271,6 +283,25 @@ export default function NewEntryPage() {
   };
 
   const toggleFavorite = async (type, name) => {
+    if (demoMode) {
+      if (type === 'language') {
+        setUserPreferences(prev => ({
+          ...prev,
+          commonLanguages: prev.commonLanguages.map(lang =>
+            lang.name === name ? { ...lang, isFavorite: !lang.isFavorite } : lang
+          )
+        }));
+      } else {
+        setUserPreferences(prev => ({
+          ...prev,
+          commonTools: prev.commonTools.map(tool =>
+            tool.name === name ? { ...tool, isFavorite: !tool.isFavorite } : tool
+          )
+        }));
+      }
+      toast.success(`${name} ${type === 'language' ? 'language' : 'tool'} favorited!`);
+      return;
+    }
     try {
       const prefsRef = doc(db, 'userPreferences', user.uid);
       const currentPrefs = userPreferences;
@@ -314,7 +345,24 @@ export default function NewEntryPage() {
 
   const addCustomItem = async (type, name) => {
     if (!name.trim()) return;
-    
+    if (demoMode) {
+      const newItem = { name: name.trim(), count: 1, lastUsed: new Date(), isFavorite: false };
+      if (type === 'language') {
+        setUserPreferences(prev => ({
+          ...prev,
+          commonLanguages: [...prev.commonLanguages, newItem].slice(-10)
+        }));
+        addLanguage(name.trim());
+      } else {
+        setUserPreferences(prev => ({
+          ...prev,
+          commonTools: [...prev.commonTools, newItem].slice(-10)
+        }));
+        addTool(name.trim());
+      }
+      toast.success(`Added ${name} to your ${type === 'language' ? 'languages' : 'tools'}!`);
+      return;
+    }
     try {
       const prefsRef = doc(db, 'userPreferences', user.uid);
       const currentPrefs = userPreferences;
@@ -479,7 +527,7 @@ export default function NewEntryPage() {
   return (
     <div className="max-w-2xl mx-auto">
       {isEditing && <div className="mb-6">
-          <Link href={`/entries/${entryId}`}>
+          <Link href={demoMode ? `/demo/entries/${entryId}` : `/entries/${entryId}`}>
             <Button variant="ghost" className="flex items-center gap-2 mb-4">
               <ArrowLeft className="h-4 w-4" />
               Back to Entry
@@ -742,7 +790,7 @@ export default function NewEntryPage() {
                 type="button"
                 className="hover:cursor-pointer"
                 variant="outline"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push(demoMode ? '/demo' : '/dashboard')}
               >
                 {isEditing ? 'Cancel Edit' : 'Cancel'}
               </Button>

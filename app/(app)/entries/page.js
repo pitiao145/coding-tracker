@@ -19,14 +19,15 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, PencilRuler } from "lucide-react";
 
-export default function EntriesPage() {
+export default function EntriesPage({ mockEntries, demoMode }) {
   const { user } = useAuth();
-  const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState(mockEntries ?? []);
+  const [loading, setLoading] = useState(mockEntries === undefined);
   const [error, setError] = useState("");
 
   // Helper to fetch entries for the current user
   const fetchEntries = useCallback(async () => {
+    if (mockEntries !== undefined) return;
     try {
       setLoading(true);
       const q = query(collection(db, "entries"), where("uid", "==", user.uid));
@@ -42,8 +43,7 @@ export default function EntriesPage() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
-
+  }, [user, mockEntries]);
 
   useEffect(() => {
     if (user) {
@@ -54,7 +54,7 @@ export default function EntriesPage() {
   return (
     <div className="w-5xl mx-auto py-8">
       <div className="mb-6">
-        <Link href="/dashboard">
+        <Link href={demoMode ? "/demo" : "/dashboard"}>
           <Button variant="ghost" className="flex items-center gap-2 mb-4">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
@@ -127,7 +127,7 @@ export default function EntriesPage() {
                     <div className="ml-2">{entry.notes}</div>
                   </div>
                 )}
-                <Link href={`/entries/${entry.id}`}>
+                <Link href={demoMode ? `/demo/entries/${entry.id}` : `/entries/${entry.id}`}>
                   <Button size="sm" className="mt-2 hover:cursor-pointer">
                     View entry
                   </Button>

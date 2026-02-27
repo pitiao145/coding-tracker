@@ -11,26 +11,26 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { ArrowLeft, Edit, Trash2, Clock, Code, BookOpen } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import Link from 'next/link';
 
-export default function EntryDetailPage({ params }) {
+export default function EntryDetailPage({ params, mockEntry, demoMode }) {
   const { user } = useAuth();
   const router = useRouter();
-  const [entry, setEntry] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [entry, setEntry] = useState(mockEntry ?? null);
+  const [loading, setLoading] = useState(mockEntry === undefined);
   
   // Unwrap params using React.use()
   const resolvedParams = use(params);
   const entryId = resolvedParams.id;
 
-  
   const loadEntry = useCallback(async () => {
+    if (mockEntry !== undefined) return;
     try {
       setLoading(true);
       const entryDoc = await getDoc(doc(db, 'entries', entryId));
       if (entryDoc.exists()) {
         const data = entryDoc.data();
-        // Check if user owns this entry
         if (data.uid === user.uid) {
           setEntry({ id: entryDoc.id, ...data });
         } else {
@@ -48,7 +48,7 @@ export default function EntryDetailPage({ params }) {
     } finally {
       setLoading(false);
     }
-  }, [entryId, user, router]);
+  }, [entryId, user, router, mockEntry]);
   
   useEffect(() => {
     if (user && entryId) {
@@ -57,10 +57,10 @@ export default function EntryDetailPage({ params }) {
   }, [user, entryId, loadEntry]);
   
   const handleDelete = async () => {
+    if (demoMode) return;
     if (!confirm('Are you sure you want to delete this entry?')) {
       return;
     }
-
     try {
       await deleteDoc(doc(db, 'entries', entryId));
       toast.success('Entry deleted successfully');
@@ -89,7 +89,7 @@ export default function EntryDetailPage({ params }) {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <Link href="/entries">
+        <Link href={demoMode ? "/demo/entries" : "/entries"}>
           <Button variant="ghost" className="flex items-center gap-2 mb-4">
             <ArrowLeft className="h-4 w-4" />
             Back to Entries
@@ -108,26 +108,28 @@ export default function EntryDetailPage({ params }) {
                 {entry.minutes} minutes
               </CardTitle>
               <CardDescription>
-                Created on {entry.createdAt?.toDate?.()?.toLocaleDateString() || 'Unknown'}
+                {demoMode ? format(parseISO(entry.date), 'MMMM d, yyyy') : `Created on ${entry.createdAt?.toDate?.()?.toLocaleDateString() || 'Unknown'}`}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Link href={`/new?date=${entry.date}`}>
-                <Button size="sm" variant="outline" className="flex items-center gap-2 hover:cursor-pointer">
-                  <Edit className="h-4 w-4 " />
-                  Edit
+            {!demoMode && (
+              <div className="flex gap-2">
+                <Link href={`/new?date=${entry.date}`}>
+                  <Button size="sm" variant="outline" className="flex items-center gap-2 hover:cursor-pointer">
+                    <Edit className="h-4 w-4 " />
+                    Edit
+                  </Button>
+                </Link>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={handleDelete}
+                  className="flex items-center gap-2 hover:cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
                 </Button>
-              </Link>
-              <Button 
-                size="sm" 
-                variant="destructive" 
-                onClick={handleDelete}
-                className="flex items-center gap-2 hover:cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

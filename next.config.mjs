@@ -7,7 +7,7 @@ const nextConfig = {
         headers: [
           {
             key: "X-Frame-Options",
-            value: "",
+            value: "SAMEORIGIN",
           },
           {
             key: "Content-Security-Policy",
